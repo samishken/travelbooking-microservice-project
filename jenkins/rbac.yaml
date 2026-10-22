@@ -1,6 +1,7 @@
 # Lets Jenkins agent pods (service account jenkins/cd-jenkins) deploy the
-# travel-booking Helm release. Scoped to the travel-booking namespace, plus
-# read access to namespaces so `helm --create-namespace` can check it exists.
+# travel-booking Helm release. Scoped to the travel-booking namespace, which
+# is created here (the pipeline does not create namespaces), plus read access
+# to namespaces.
 apiVersion: v1
 kind: Namespace
 metadata:

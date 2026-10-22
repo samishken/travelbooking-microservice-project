@@ -183,7 +183,6 @@ pipeline {
                     echo "===== Deploying to EKS ====="
                     helm upgrade --install travel-booking ${HELM_CHART_PATH} \\
                       --namespace ${NAMESPACE} \\
-                      --create-namespace \\
                       --wait \\
                       --timeout 5m
                     echo "Deployment completed successfully"
