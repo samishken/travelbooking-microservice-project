@@ -21,6 +21,27 @@ controller:
         allowAnonymousRead: false
 
     configScripts:
+      # Pipeline job, seeded with Job DSL on every Jenkins start
+      jobs-config: |
+        jobs:
+          - script: >
+              pipelineJob('travel-booking-pipeline') {
+                description('Build, scan and deploy TravelBooking to EKS')
+                definition {
+                  cpsScm {
+                    scm {
+                      git {
+                        remote {
+                          url('https://github.com/samishken/travelbooking-microservice-project.git')
+                        }
+                        branch('*/main')
+                      }
+                    }
+                    scriptPath('Jenkinsfile')
+                    lightweight(true)
+                  }
+                }
+              }
       cloud-config: |
         jenkins:
           clouds:
@@ -121,6 +142,7 @@ controller:
     - workflow-aggregator:latest
     - credentials-binding:latest
     - aws-credentials:latest
+    - job-dsl:latest
     - github:latest
     - configuration-as-code:latest
     - pipeline-stage-view:latest
