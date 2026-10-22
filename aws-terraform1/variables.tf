@@ -6,6 +6,12 @@ variable "aws_region" {
   type        = string
 }
 
+variable "aws_profile" {
+  description = "AWS CLI profile used to deploy"
+  type        = string
+  default     = "devops-infra"
+}
+
 ##############################################
 # VPC
 ##############################################
@@ -104,4 +110,22 @@ variable "tags" {
     Terraform   = "true"
     Environment = "Production"
   }
+}
+
+variable "cluster_admin_arns" {
+  description = "IAM user/role ARNs granted EKS cluster admin access"
+  type        = list(string)
+  default     = []
+}
+
+variable "domain_name" {
+  description = "Root domain for the application (Route 53 hosted zone)"
+  type        = string
+}
+
+
+variable "enable_https" {
+  description = "Create and validate an ACM certificate for domain_name (requires the domain's registrar nameservers to point at the Route 53 zone)"
+  type        = bool
+  default     = false
 }

@@ -35,7 +35,7 @@ output "cluster_certificate" {
 }
 
 output "kubectl_command" {
-  value = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
+  value = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name} --profile ${var.aws_profile}"
 }
 
 ##############################################
@@ -55,4 +55,20 @@ output "cluster_role" {
 
 output "node_role" {
   value = module.iam.node_role_arn
+}
+
+
+##############################################
+# DNS / TLS
+##############################################
+output "certificate_arn" {
+  value = one(module.acm[*].certificate_arn)
+}
+
+output "hosted_zone_id" {
+  value = module.dns.zone_id
+}
+
+output "name_servers" {
+  value = module.dns.name_servers
 }

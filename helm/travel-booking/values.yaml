@@ -58,7 +58,7 @@ postgres:
   servicename: postgres
   image: postgres:15-alpine
   storage: 10Gi
-  storageClass: standard
+  storageClass: gp3
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 db:
@@ -76,8 +76,15 @@ redis:
   host: redis
   port: "6379"
 
-# ─── Gateway ──────────────────────────────────────────────────────────────────
-
+# ─── Ingress (AWS ALB) ────────────────────────────────────────────────────────
+ingress:
+  className: alb
+  groupName: travel-booking
+  hosts:
+    - weyewweyew.com
+    - www.weyewweyew.com
+  # Leave empty to let the ALB controller discover the matching ACM certificate
+  certificateArn: ""
 
 # ─── Secrets ──────────────────────────────────────────────────────────────────
 secrets:

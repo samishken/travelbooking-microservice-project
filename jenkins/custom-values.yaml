@@ -1,7 +1,10 @@
 controller:
+  # Admin credentials come from the "jenkins-admin" Secret (see jenkins/jenkins.md)
   admin:
-    username: "stephen"
-    password: "stephen@123"
+    existingSecret: "jenkins-admin"
+    userKey: jenkins-admin-user
+    passwordKey: jenkins-admin-password
+    createSecret: false
 
   # Jenkins Configuration as Code
   JCasC:
@@ -10,9 +13,9 @@ controller:
         allowsSignup: false
         enableCaptcha: false
         users:
-          - id: "stephen"
-            name: "stephen"
-            password: "stephen@123"
+          - id: "${chart-admin-username}"
+            name: "${chart-admin-username}"
+            password: "${chart-admin-password}"
     authorizationStrategy: |
       loggedInUsersCanDoAnything:
         allowAnonymousRead: false
@@ -117,6 +120,7 @@ controller:
     - blueocean:latest
     - workflow-aggregator:latest
     - credentials-binding:latest
+    - aws-credentials:latest
     - github:latest
     - configuration-as-code:latest
     - pipeline-stage-view:latest
@@ -130,7 +134,7 @@ controller:
     - build-timeout:latest
 
   javaOpts: "-Xms1536m -Xmx1536m -Djenkins.install.runSetupWizard=false"
-  jenkinsUrl: "http://steveops.site/jenkins"
+  jenkinsUrl: "https://weyewweyew.com/jenkins"
   jenkinsUriPrefix: "/jenkins"
 
   resources:
@@ -141,10 +145,27 @@ controller:
       cpu: 100m
       memory: 1024Mi
 
-  serviceType: NodePort
+  serviceType: ClusterIP
+
+  # Shares the travel-booking ALB; reachable at https://weyewweyew.com/jenkins
+  ingress:
+    enabled: true
+    apiVersion: "networking.k8s.io/v1"
+    ingressClassName: alb
+    hostName: weyewweyew.com
+    path: /jenkins
+    pathType: Prefix
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/group.name: travel-booking
+      alb.ingress.kubernetes.io/group.order: "10"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/healthcheck-path: /jenkins/login
 
 persistence:
-  enabled: false
+  enabled: true
   size: 20Gi
   storageClass: "gp3"
 

@@ -159,9 +159,15 @@ kubectl get nodes -o wide | awk '{print $7}' | tail -1
 
 Access Jenkins at: `http://<NODE_EXTERNAL_IP>:<NODE_PORT>/jenkins`
 
-**Login credentials:**
-- Username: `stephen`
-- Password: `stephen@123`
+**Login credentials** come from the `jenkins-admin` Secret (created before `helm install`):
+```bash
+kubectl -n jenkins create secret generic jenkins-admin \
+  --from-literal=jenkins-admin-user=Sam \
+  --from-literal=jenkins-admin-password="$(openssl rand -base64 18 | tr -d '/+=')"
+
+# Read the password back
+kubectl -n jenkins get secret jenkins-admin -o jsonpath='{.data.jenkins-admin-password}' | base64 -d; echo
+```
 
 ---
 
@@ -216,7 +222,7 @@ Recommended Global Environment Variables (Manage Jenkins â†’ Configure System â†
 1. Scroll down to **Pipeline** section
 2. Select **Pipeline script from SCM**
 3. **SCM:** Git
-4. **Repository URL:** `https://github.com/stephenadonis-group/travelbooking-microservice-project.git`
+4. **Repository URL:** `https://github.com/samishken/travelbooking-microservice-project.git`
 5. **Branch:** `*/main`
 6. **Script Path:** `Jenkinsfile`
 7. Click **Save**
@@ -267,12 +273,11 @@ kubectl get ingress -n travel-booking```
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| `admin.username` | stephen | Jenkins admin login |
-| `admin.password` | stephen@123 | Jenkins admin password |
+| `admin.existingSecret` | jenkins-admin | Admin username/password from a Kubernetes Secret |
 | `jenkinsUriPrefix` | /jenkins | Access Jenkins at `/jenkins` path |
-| `serviceType` | NodePort | Exposes Jenkins on a node port |
-| `persistence.size` | 15Gi | Storage for Jenkins data and plugins |
-| `persistence.storageClass` | premium-rwo | High-performance SSD storage on GKE |
+| `serviceType` | ClusterIP | Exposed through the ALB Ingress at `https://weyewweyew.com/jenkins` |
+| `persistence.size` | 20Gi | Storage for Jenkins data and plugins (gp3) |
+| `persistence.storageClass` | (default: gp3) | EBS gp3 volume via the EBS CSI driver |
 | `containerCapStr` | 10 | Max 10 agent pods running at once |
 | `installPlugins` | (list) | Pre-installed plugins for pipelines, Git, Blue Ocean, etc. |
 

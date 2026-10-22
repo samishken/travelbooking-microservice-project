@@ -10,6 +10,10 @@ keys.json
 *.tfstate.backup
 *.tfstate.lock.info
 .terraform.lock.hcl
+*.tfvars
+tfplan
+!*.tfvars.example
+aws-terraform1.zip
 
 # ─── Node.js ──────────────────────────────────────────────────────────────────
 node_modules/

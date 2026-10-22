@@ -34,7 +34,8 @@ resource "aws_subnet" "public1" {
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
   tags = merge(var.tags, {
-    Name = "public-subnet-1"
+    Name                     = "public-subnet-1"
+    "kubernetes.io/role/elb" = "1"
   })
 }
 
@@ -47,7 +48,8 @@ resource "aws_subnet" "public2" {
   availability_zone       = data.aws_availability_zones.available.names[1]
   map_public_ip_on_launch = true
   tags = merge(var.tags, {
-    Name = "public-subnet-2"
+    Name                     = "public-subnet-2"
+    "kubernetes.io/role/elb" = "1"
   })
 }
 
@@ -59,7 +61,8 @@ resource "aws_subnet" "private1" {
   cidr_block        = var.private_subnets[0]
   availability_zone = data.aws_availability_zones.available.names[0]
   tags = merge(var.tags, {
-    Name = "private-subnet-1"
+    Name                              = "private-subnet-1"
+    "kubernetes.io/role/internal-elb" = "1"
   })
 }
 
@@ -71,7 +74,8 @@ resource "aws_subnet" "private2" {
   cidr_block        = var.private_subnets[1]
   availability_zone = data.aws_availability_zones.available.names[1]
   tags = merge(var.tags, {
-    Name = "private-subnet-2"
+    Name                              = "private-subnet-2"
+    "kubernetes.io/role/internal-elb" = "1"
   })
 }
 

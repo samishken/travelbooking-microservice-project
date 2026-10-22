@@ -62,3 +62,8 @@ variable "tags" {
   description = "Common Tags"
   type        = map(string)
 }
+variable "cluster_admin_arns" {
+  description = "IAM user/role ARNs granted cluster admin access"
+  type        = list(string)
+  default     = []
+}

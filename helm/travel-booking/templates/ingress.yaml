@@ -2,27 +2,32 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: travel-booking-ingress
-  namespace: travel-booking
+  namespace: {{ .Values.namespace }}
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/group.name: travel-booking
+    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.groupName }}
+    # Evaluated after other Ingresses in the group (e.g. /jenkins) since "/" catches everything
+    alb.ingress.kubernetes.io/group.order: "100"
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:896618135199:certificate/d015ab77-e7df-4f19-8dec-c5fe492ab636
+    {{- with .Values.ingress.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ . }}
+    {{- end }}
     alb.ingress.kubernetes.io/ssl-redirect: "443"
 
 spec:
-  ingressClassName: alb
+  ingressClassName: {{ .Values.ingress.className }}
 
   rules:
-    - host: steveops.site
+    {{- range .Values.ingress.hosts }}
+    - host: {{ . }}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: frontend-service
+                name: {{ $.Values.frontend.servicename }}
                 port:
                   number: 80
 
@@ -30,7 +35,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: user-service-service
+                name: {{ $.Values.userService.servicename }}
                 port:
                   number: 3001
 
@@ -38,7 +43,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: search-service-service
+                name: {{ $.Values.searchService.servicename }}
                 port:
                   number: 3002
 
@@ -46,7 +51,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: booking-service-service
+                name: {{ $.Values.bookingService.servicename }}
                 port:
                   number: 3003
 
@@ -54,7 +59,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: payment-service-service
+                name: {{ $.Values.paymentService.servicename }}
                 port:
                   number: 3004
 
@@ -62,57 +67,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: notification-service-service
+                name: {{ $.Values.notificationService.servicename }}
                 port:
                   number: 3005
-
-    - host: www.steveops.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend-service
-                port:
-                  number: 80
-
-          - path: /api/users
-            pathType: Prefix
-            backend:
-              service:
-                name: user-service-service
-                port:
-                  number: 3001
-
-          - path: /api/search
-            pathType: Prefix
-            backend:
-              service:
-                name: search-service-service
-                port:
-                  number: 3002
-
-          - path: /api/bookings
-            pathType: Prefix
-            backend:
-              service:
-                name: booking-service-service
-                port:
-                  number: 3003
-
-          - path: /api/payments
-            pathType: Prefix
-            backend:
-              service:
-                name: payment-service-service
-                port:
-                  number: 3004
-
-          - path: /api/notifications
-            pathType: Prefix
-            backend:
-              service:
-                name: notification-service-service
-                port:
-                  number: 3005
+    {{- end }}
