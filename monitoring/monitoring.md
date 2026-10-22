@@ -310,7 +310,9 @@ kubectl apply -f monitoring/alertrules/ -n monitoring
 To expose the monitoring stack externally, create an AWS ALB Ingress that routes traffic to Grafana, Prometheus, and Alertmanager.
 Apply the Ingress:
 ```
-kubectl apply -f monitoring/ingress.yaml
+# Only your IP can reach these routes (others fall through to the app)
+ALLOWED_CIDR="$(curl -s https://checkip.amazonaws.com)/32" \
+  envsubst '${ALLOWED_CIDR}' < monitoring/ingress.yaml | kubectl apply -f -
 ```
 What this does
 1. Creates an AWS Application Load Balancer (ALB) Ingress that exposes the monitoring services.
@@ -684,7 +686,9 @@ kubectl apply -f monitoring/alertrules/
 kubectl apply -f monitoring/dashboards/
 
 # ─── Step 8: Create Monitoring Ingress ────────────────────────────────────────
-kubectl apply -f monitoring/ingress.yaml
+# Only your IP can reach these routes (others fall through to the app)
+ALLOWED_CIDR="$(curl -s https://checkip.amazonaws.com)/32" \
+  envsubst '${ALLOWED_CIDR}' < monitoring/ingress.yaml | kubectl apply -f -
 
 # ─── Step 9: Verify the Monitoring Ingress ────────────────────────────────────
 kubectl get ingress -A
@@ -848,7 +852,9 @@ All three should return **HTTP 200** or **HTTP 302** (redirect to login for Graf
 
 If you modify the monitoring ingress configuration:
 ```
-kubectl apply -f monitoring/ingress.yaml
+# Only your IP can reach these routes (others fall through to the app)
+ALLOWED_CIDR="$(curl -s https://checkip.amazonaws.com)/32" \
+  envsubst '${ALLOWED_CIDR}' < monitoring/ingress.yaml | kubectl apply -f -
 ```
 Verify the changes:
 ```
