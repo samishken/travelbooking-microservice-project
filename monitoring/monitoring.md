@@ -201,10 +201,22 @@ The values.yaml file already configures:
 | Prometheus       | 50Gi Amazon EBS Persistent Volume    |
 | Grafana          | 10Gi Amazon EBS Persistent Volume    |
 | Alertmanager     | 5Gi Amazon EBS Persistent Volume     |
-| StorageClass     | `standard` (Amazon EBS CSI Driver)   |
-| Prometheus URL   | `https://prometheus.steveops.site`   |
-| Grafana URL      | `https://steveops.site/grafana`      |
-| Alertmanager URL | `https://alertmanager.steveops.site` |
+| StorageClass     | `gp3` (Amazon EBS CSI Driver)          |
+| Prometheus URL   | `https://weyewweyew.com/prometheus`    |
+| Grafana URL      | `https://weyewweyew.com/grafana`       |
+| Alertmanager URL | `https://weyewweyew.com/alertmanager`  |
+| Grafana admin    | `grafana-admin` Secret (see below)     |
+
+Create the Grafana admin Secret **before** `helm install`:
+```bash
+kubectl create namespace monitoring
+kubectl -n monitoring create secret generic grafana-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="$(openssl rand -base64 18 | tr -d '/+=')"
+
+# Read the password back
+kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
 
 **What this does:**
 - `kube-prometheus-stack` is the release name
@@ -331,36 +343,22 @@ kubectl describe ingress monitoring-ingress -n monitoring
 ```
 You should see routes similar to:
 ```
-Host: steveops.site
+Host: weyewweyew.com
   /grafana
-
-Host: prometheus.steveops.site
-  /
-
-Host: alertmanager.steveops.site
-  /
+  /prometheus
+  /alertmanager
 ```
-Step 7: Configure Route 53
-Create DNS records pointing the monitoring subdomains to the existing AWS Application Load Balancer.
-| Record Type | Name                       | Alias Target      |
-| ----------- | -------------------------- | ----------------- |
-| A (Alias)   | prometheus.steveops.site   | TravelBooking ALB |
-| A (Alias)   | alertmanager.steveops.site | TravelBooking ALB |
-
-Grafana continues to use:
-```
-https://steveops.site/grafana
-```
-No additional Route 53 record is required for Grafana because it is served as a subpath of the main application domain.
+Step 7: DNS
+No extra Route 53 records are needed: all three tools are sub-paths of `weyewweyew.com`, whose record ExternalDNS already manages, and the ACM wildcard certificate is discovered automatically.
 # Verify Monitoring Access
 Wait a few minutes for the ALB and Route 53 changes to propagate.
 Test each endpoint:
 ```
-curl -I https://steveops.site/grafana
+curl -I https://weyewweyew.com/grafana
 
-curl -I https://prometheus.steveops.site
+curl -I https://weyewweyew.com/prometheus
 
-curl -I https://alertmanager.steveops.site
+curl -I https://weyewweyew.com/alertmanager
 ```
 Expected responses:
 | Endpoint     | Expected Response          |
@@ -372,9 +370,9 @@ Expected responses:
 Monitoring Endpoints
 | Component    | URL                                                                      |
 | ------------ | ------------------------------------------------------------------------ |
-| Grafana      | [https://steveops.site/grafana](https://steveops.site/grafana)           |
-| Prometheus   | [https://prometheus.steveops.site](https://prometheus.steveops.site)     |
-| Alertmanager | [https://alertmanager.steveops.site](https://alertmanager.steveops.site) |
+| Grafana      | [https://weyewweyew.com/grafana](https://weyewweyew.com/grafana)           |
+| Prometheus   | [https://weyewweyew.com/prometheus](https://weyewweyew.com/prometheus)     |
+| Alertmanager | [https://weyewweyew.com/alertmanager](https://weyewweyew.com/alertmanager) |
 
 | Alert Name | Condition | Severity | Fires After |
 |------------|-----------|----------|-------------|
@@ -441,11 +439,11 @@ You should see the monitoring ingress associated with the same AWS Application L
 Test the Endpoints:
 Use curl to verify each endpoint.
 ```
-curl -I https://steveops.site/grafana
+curl -I https://weyewweyew.com/grafana
 
-curl -I https://prometheus.steveops.site
+curl -I https://weyewweyew.com/prometheus
 
-curl -I https://alertmanager.steveops.site
+curl -I https://weyewweyew.com/alertmanager
 ```
 Expected responses:
 | Endpoint     | Expected Response          |
@@ -459,9 +457,9 @@ Access URLs
 Open the following URLs in your browser:
 | Tool             | URL                                  | Purpose                              |
 | ---------------- | ------------------------------------ | ------------------------------------ |
-| **Grafana**      | `https://steveops.site/grafana`      | Dashboards and visualization         |
-| **Prometheus**   | `https://prometheus.steveops.site`   | Metrics queries and targets          |
-| **Alertmanager** | `https://alertmanager.steveops.site` | View active alerts and alert history |
+| **Grafana**      | `https://weyewweyew.com/grafana`      | Dashboards and visualization         |
+| **Prometheus**   | `https://weyewweyew.com/prometheus`   | Metrics queries and targets          |
+| **Alertmanager** | `https://weyewweyew.com/alertmanager` | View active alerts and alert history |
 
 
 ### Grafana Login Credentials
@@ -618,7 +616,7 @@ The `monitoring/helm/values.yaml` file configures the entire stack. Here's what 
 | `retention`                               | `15d`                              | Retains metrics for 15 days.                                                  |
 | `storageClassName`                        | `standard`                         | Uses the Amazon EBS CSI StorageClass for persistent storage.                  |
 | `storage`                                 | `50Gi`                             | Persistent storage for Prometheus metrics.                                    |
-| `externalUrl`                             | `https://prometheus.steveops.site` | Configures Prometheus to use its public URL.                                  |
+| `externalUrl`                             | `https://weyewweyew.com/prometheus` | Configures Prometheus to use its public URL.                                  |
 | `serviceMonitorSelectorNilUsesHelmValues` | `false`                            | Allows Prometheus to discover ServiceMonitors outside the Helm release.       |
 | `serviceMonitorSelector`                  | `{}`                               | Selects all ServiceMonitors.                                                  |
 | `serviceMonitorNamespaceSelector`         | `{}`                               | Watches ServiceMonitors in all namespaces.                                    |
@@ -635,7 +633,7 @@ The `monitoring/helm/values.yaml` file configures the entire stack. Here's what 
 | `adminUser`                   | `admin`                         | Grafana administrator username.                                        |
 | `adminPassword`               | `TravelBook@Admin123`           | Grafana administrator password.                                        |
 | `service.type`                | `ClusterIP`                     | Internal service exposed through the AWS ALB Ingress.                  |
-| `root_url`                    | `https://steveops.site/grafana` | Configures Grafana to operate correctly behind the `/grafana` subpath. |
+| `root_url`                    | `https://weyewweyew.com/grafana` | Configures Grafana to operate correctly behind the `/grafana` subpath. |
 | `serve_from_sub_path`         | `true`                          | Enables Grafana to serve assets from `/grafana`.                       |
 | `persistence.enabled`         | `true`                          | Enables persistent storage for dashboards and settings.                |
 | `storageClassName`            | `standard`                      | Uses Amazon EBS CSI volumes.                                           |
@@ -649,7 +647,7 @@ The `monitoring/helm/values.yaml` file configures the entire stack. Here's what 
 | Setting            | Value                                | Why                                                   |
 | ------------------ | ------------------------------------ | ----------------------------------------------------- |
 | `service.type`     | `ClusterIP`                          | Internal service exposed through the AWS ALB Ingress. |
-| `externalUrl`      | `https://alertmanager.steveops.site` | Public URL for Alertmanager.                          |
+| `externalUrl`      | `https://weyewweyew.com/alertmanager` | Public URL for Alertmanager.                          |
 | `storageClassName` | `standard`                           | Uses Amazon EBS CSI persistent storage.               |
 | `storage`          | `5Gi`                                | Persistent storage for alert data.                    |
 
@@ -692,19 +690,14 @@ kubectl apply -f monitoring/ingress.yaml
 kubectl get ingress -A
 kubectl describe ingress monitoring-ingress -n monitoring
 
-# ─── Step 10: Configure Route 53 ──────────────────────────────────────────────
-# Create the following Alias A records:
-#
-# prometheus.steveops.site   → TravelBooking ALB
-# alertmanager.steveops.site → TravelBooking ALB
-#
-# Grafana remains available at:
-# https://steveops.site/grafana
+# ─── Step 10: DNS ──────────────────────────────────────────────────────────────
+# Nothing to do: everything is served under https://weyewweyew.com/<tool>
+# and ExternalDNS already manages the weyewweyew.com record.
 
 # ─── Step 11: Verify Access ───────────────────────────────────────────────────
-curl -I https://steveops.site/grafana
-curl -I https://prometheus.steveops.site
-curl -I https://alertmanager.steveops.site
+curl -I https://weyewweyew.com/grafana
+curl -I https://weyewweyew.com/prometheus
+curl -I https://weyewweyew.com/alertmanager
 
 # Grafana Credentials
 # Username: admin
@@ -811,9 +804,9 @@ Public URLs:
 
 | Tool             | URL                                  |
 | ---------------- | ------------------------------------ |
-| **Grafana**      | `https://steveops.site/grafana`      |
-| **Prometheus**   | `https://prometheus.steveops.site`   |
-| **Alertmanager** | `https://alertmanager.steveops.site` |
+| **Grafana**      | `https://weyewweyew.com/grafana`      |
+| **Prometheus**   | `https://weyewweyew.com/prometheus`   |
+| **Alertmanager** | `https://weyewweyew.com/alertmanager` |
 
 
 Verify the Monitoring Ingress
@@ -829,19 +822,17 @@ expected output:
 * SSL certificate attached through AWS Certificate Manager (ACM)
 * 
 Verify Route 53 DNS
-Verify that the monitoring subdomains resolve to your Application Load Balancer.
+Verify that the domain resolves to your Application Load Balancer.
 ```
-nslookup prometheus.steveops.site
-
-nslookup alertmanager.steveops.site
+nslookup weyewweyew.com
 ```
 Verify the Endpoints
 ```
-curl -I https://steveops.site/grafana
+curl -I https://weyewweyew.com/grafana
 
-curl -I https://prometheus.steveops.site
+curl -I https://weyewweyew.com/prometheus
 
-curl -I https://alertmanager.steveops.site
+curl -I https://weyewweyew.com/alertmanager
 ```
 
 | Endpoint     | Expected Response |
@@ -873,7 +864,7 @@ Create the following Alias A Records in your Route 53 hosted zone:
 
 Grafana continues to use the main application domain:
 ```
-https://steveops.site/grafana
+https://weyewweyew.com/grafana
 ```
 ### Credentials
 

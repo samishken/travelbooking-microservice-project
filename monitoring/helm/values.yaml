@@ -23,7 +23,7 @@ prometheus:
   prometheusSpec:
     retention: 15d
 
-    externalUrl: https://steveops.site/prometheus
+    externalUrl: https://weyewweyew.com/prometheus
     routePrefix: /prometheus
 
     storageSpec:
@@ -57,12 +57,15 @@ prometheus:
 grafana:
   enabled: true
 
-  adminUser: admin
-  adminPassword: "TravelBook@Admin123"
+  # Admin credentials come from the "grafana-admin" Secret (see monitoring.md)
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
 
   grafana.ini:
     server:
-      root_url: https://steveops.site/grafana
+      root_url: https://weyewweyew.com/grafana
       serve_from_sub_path: true
 
   persistence:
@@ -72,6 +75,10 @@ grafana:
 
   service:
     type: ClusterIP
+
+  # Metrics move under the sub-path with serve_from_sub_path
+  serviceMonitor:
+    path: /grafana/metrics
 
   sidecar:
     dashboards:
@@ -90,7 +97,7 @@ alertmanager:
     type: ClusterIP
 
   alertmanagerSpec:
-    externalUrl: https://steveops.site/alertmanager
+    externalUrl: https://weyewweyew.com/alertmanager
     routePrefix: /alertmanager
 
     storage:

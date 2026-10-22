@@ -4,8 +4,11 @@
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-## Step 2: Create monitoring namespace
+## Step 2: Create monitoring namespace and Grafana admin Secret
 kubectl create namespace monitoring
+kubectl -n monitoring create secret generic grafana-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="$(openssl rand -base64 18 | tr -d '/+=')"
 
 ## Step 3: Install kube-prometheus-stack
 helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
@@ -24,10 +27,10 @@ kubectl apply -f monitoring/dashboards/ -n monitoring
 
 ## Access Grafana locally
 kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
-# Open: http://localhost:3000
+# Open: http://localhost:3000/grafana
 # Username: admin
-# Password: TravelBook@Admin123
+# Password: kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
 
 ## Access Prometheus locally
 kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring
-# Open: http://localhost:9090
+# Open: http://localhost:9090/prometheus
