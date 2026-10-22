@@ -1,3 +1,16 @@
+// ═════════════════════════════════════════════════════════════════════════════
+// TravelBooking CI/CD Pipeline
+//
+// Test → Build & Push images to Amazon ECR → Trivy scan → Deploy to EKS (Helm)
+//
+// Runs on a Kubernetes agent pod defined in jenkins/custom-values.yaml
+// (label "travelbooking"), which has one container per tool: golang, nodejs,
+// awscli, kaniko, docker, helm. Each stage picks its container.
+//
+// Required Jenkins credentials (Manage Jenkins → Credentials):
+//   aws-account-id   Secret text      AWS account ID that owns the ECR repos
+//   aws-credentials  AWS Credentials  Access key with ECR push permissions
+// ═════════════════════════════════════════════════════════════════════════════
 pipeline {
     agent { label 'travelbooking' }
 
@@ -5,12 +18,18 @@ pipeline {
         AWS_DEFAULT_REGION = 'us-east-1'
         AWS_ACCOUNT_ID     = credentials('aws-account-id')
         ECR_REGISTRY       = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+        // Every build gets a unique, traceable image tag, e.g. 1.0.42
         IMAGE_TAG          = "1.0.${BUILD_NUMBER}"
         HELM_CHART_PATH    = 'helm/travel-booking'
         NAMESPACE          = 'travel-booking'
     }
 
     stages {
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGE: Test - Go Services
+        // Downloads modules and runs `go vet` (static analysis) on each Go
+        // microservice. Any vet error fails the build.
+        // ─────────────────────────────────────────────────────────────────────
         stage('Test - Go Services') {
             steps {
                 container('golang') {
@@ -29,6 +48,10 @@ pipeline {
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGE: Test - Frontend
+        // Verifies the React frontend's dependencies install cleanly.
+        // ─────────────────────────────────────────────────────────────────────
         stage('Test - Frontend') {
             steps {
                 container('nodejs') {
@@ -43,24 +66,34 @@ pipeline {
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGE: Build & Push Services
+        // Builds all six images with Kaniko (no Docker daemon needed) and pushes
+        // each to ECR twice: with the build tag (deployed) and as :latest
+        // (used by the Trivy scan).
+        // ─────────────────────────────────────────────────────────────────────
         stage('Build & Push Services') {
             steps {
+                // Exposes the aws-credentials key pair as AWS_ACCESS_KEY_ID /
+                // AWS_SECRET_ACCESS_KEY for the aws CLI below
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials',
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
-        
+
+                    // Kaniko can't run the aws CLI itself, so log in to ECR here
+                    // and write a Docker config.json to the shared workspace
                     container('awscli') {
                         sh '''
                         echo "===== Configuring Amazon ECR Authentication ====="
-        
+
                         mkdir -p /home/jenkins/.docker
-        
+
                         PASSWORD=$(aws ecr get-login-password --region ${AWS_DEFAULT_REGION})
                         AUTH=$(printf "AWS:%s" "$PASSWORD" | base64 | tr -d '\n')
-        
+
                         printf '{
           "auths": {
             "%s": {
@@ -68,18 +101,19 @@ pipeline {
             }
           }
         }\n' "${ECR_REGISTRY}" "${AUTH}" > /home/jenkins/.docker/config.json
-        
+
                         echo "Amazon ECR authentication configured successfully."
                         '''
                     }
-        
+
                     container('kaniko') {
+                        // Kaniko reads registry credentials from /kaniko/.docker
                         sh '''
                         echo "===== Preparing Kaniko ====="
-        
+
                         mkdir -p /kaniko/.docker
                         cp /home/jenkins/.docker/config.json /kaniko/.docker/config.json
-        
+
                         if [ -f /kaniko/.docker/config.json ]; then
                             echo "Docker configuration copied successfully."
                         else
@@ -87,9 +121,11 @@ pipeline {
                             exit 1
                         fi
                         '''
-        
+
                         script {
-        
+
+                            // Each name is both the build context directory
+                            // and the ECR repository name
                             def services = [
                                 'frontend',
                                 'user-service',
@@ -98,12 +134,14 @@ pipeline {
                                 'payment-service',
                                 'notification-service'
                             ]
-        
+
                             for (service in services) {
-        
+
+                                // --cache-repo stores layers in the kaniko-cache
+                                // ECR repo so later builds skip unchanged layers
                                 sh """
                                 echo "===== Building ${service} ====="
-        
+
                                 /kaniko/executor \
                                   --context ./${service} \
                                   --dockerfile ./${service}/Dockerfile \
@@ -111,32 +149,35 @@ pipeline {
                                   --destination ${ECR_REGISTRY}/${service}:latest \
                                   --cache=true \
                                   --cache-repo=${ECR_REGISTRY}/kaniko-cache
-        
+
                                 echo "${service} image built and pushed successfully."
                                 """
-        
+
                             }
                         }
                     }
                 }
             }
-        }    
+        }
+
         // ─────────────────────────────────────────────────────────────────────
         // STAGE: Trivy Security Scan
+        // Reports HIGH/CRITICAL vulnerabilities in each image. Informational
+        // only: --exit-code 0 and `|| true` mean findings never fail the build.
         // ─────────────────────────────────────────────────────────────────────
         stage('Trivy Security Scan') {
             steps {
                 container('docker') {
                     script {
                         def services = ['user-service', 'search-service', 'booking-service', 'payment-service', 'notification-service', 'frontend']
-                        
+
                         // Install Trivy
                         sh '''
                         apk add --no-cache curl tar
                         curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
                         trivy --version
                         '''
-        
+
                         // Scan each image
                         for (svc in services) {
                             def scanStatus = sh(
@@ -155,27 +196,41 @@ pipeline {
                 }
             }
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGE: Update Helm Values
+        // Points every service's image in values.yaml at this build's tag.
+        // The edit only lives in this build's workspace; it isn't committed.
+        // ─────────────────────────────────────────────────────────────────────
         stage('Update Helm Values') {
             steps {
                 container('helm') {
                     sh '''
                     echo "===== Updating Helm values.yaml ====="
-        
+
                     sed -i "s|image: .*frontend:.*|image: ${ECR_REGISTRY}/frontend:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
                     sed -i "s|image: .*user-service:.*|image: ${ECR_REGISTRY}/user-service:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
                     sed -i "s|image: .*search-service:.*|image: ${ECR_REGISTRY}/search-service:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
                     sed -i "s|image: .*booking-service:.*|image: ${ECR_REGISTRY}/booking-service:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
                     sed -i "s|image: .*payment-service:.*|image: ${ECR_REGISTRY}/payment-service:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
                     sed -i "s|image: .*notification-service:.*|image: ${ECR_REGISTRY}/notification-service:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values.yaml
-        
+
                     echo "===== Updated Images ====="
-        
+
                     grep "image:" ${HELM_CHART_PATH}/values.yaml
                     '''
                 }
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGE: Deploy to EKS
+        // Installs or upgrades the travel-booking release and waits up to 5
+        // minutes for every pod to become Ready.
+        // Runs as the cd-jenkins service account, which jenkins/rbac.yaml
+        // allows to deploy only into the travel-booking namespace. That
+        // namespace is created by rbac.yaml, so no --create-namespace here.
+        // ─────────────────────────────────────────────────────────────────────
         stage('Deploy to EKS') {
             steps {
                 container('helm') {
@@ -192,6 +247,7 @@ pipeline {
         }
     }
 
+    // Runs after all stages, whatever the outcome
     post {
         success {
             echo "✅ Pipeline completed successfully! Build #${BUILD_NUMBER}"
